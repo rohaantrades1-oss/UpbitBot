@@ -1,0 +1,129 @@
+2026-04-20 04:56:55  [ERROR]  Startup message failed: Timed out
+2026-04-20 04:56:55  [INFO]  🔍 Screener loop started...
+2026-04-20 04:56:55  [INFO]  ── New scan cycle ──
+2026-04-20 04:56:58  [INFO]  Total KRW markets found: 247
+2026-04-20 04:58:32  [INFO]  🛑 Bot stopped by user.
+2026-04-20 05:04:45  [ERROR]  Startup message failed: Timed out
+2026-04-20 05:04:45  [INFO]  🔍 Screener loop started...
+2026-04-20 05:04:45  [INFO]  ── New scan cycle ──
+2026-04-20 05:04:47  [INFO]  Total KRW markets found: 247
+2026-04-20 05:12:19  [INFO]  🛑 Bot stopped by user.
+2026-04-20 05:13:12  [ERROR]  Startup message failed: Timed out
+2026-04-20 05:13:12  [INFO]  🔍 Screener loop started...
+2026-04-20 05:13:12  [INFO]  ── New scan cycle ──
+2026-04-20 05:13:14  [INFO]  Total KRW markets found: 247
+2026-04-20 05:14:01  [INFO]  🛑 Bot stopped by user.
+2026-04-20 05:18:10  [ERROR]  Startup message failed: Timed out
+2026-04-20 05:18:10  [INFO]  🔍 Screener loop started...
+2026-04-20 05:18:10  [INFO]  ── New scan cycle ──
+2026-04-20 05:18:13  [INFO]  Total KRW markets found: 247
+2026-04-20 05:19:51  [INFO]  🛑 Bot stopped by user.
+2026-04-20 05:23:35  [ERROR]  Startup message failed: Timed out
+2026-04-20 05:23:35  [INFO]  🔍 Screener loop started...
+2026-04-20 05:23:35  [INFO]  ── New scan cycle ──
+2026-04-20 05:23:37  [INFO]  Total KRW markets found: 247
+2026-04-20 05:29:45  [INFO]  Matched coins this cycle: 0
+2026-04-20 05:29:45  [INFO]  Cycle done in 370.3s. Next scan in 0s.
+2026-04-20 05:29:45  [INFO]  ── New scan cycle ──
+2026-04-20 05:29:45  [ERROR]  Error fetching markets: HTTPSConnectionPool(host='api.upbit.com', port=443): Max retries exceeded with url: /v1/market/all?isDetails=false (Caused by NewConnectionError("HTTPSConnection(host='api.upbit.com', port=443): Failed to establish a new connection: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions"))
+2026-04-20 05:29:45  [WARNING]  No markets fetched, retrying next cycle.
+2026-04-20 05:30:14  [ERROR]  Error on reading from the event loop self pipe
+loop: <ProactorEventLoop running=True closed=False debug=False>
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\windows_events.py", line 463, in finish_socket_func
+    return ov.getresult()
+           ~~~~~~~~~~~~^^
+OSError: [WinError 64] The specified network name is no longer available
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\proactor_events.py", line 794, in _loop_self_reading
+    f.result()  # may raise
+    ~~~~~~~~^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\windows_events.py", line 804, in _poll
+    value = callback(transferred, key, ov)
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\windows_events.py", line 467, in finish_socket_func
+    raise ConnectionResetError(*exc.args)
+ConnectionResetError: [WinError 64] The specified network name is no longer available
+2026-04-20 05:30:45  [ERROR]  Error on reading from the event loop self pipe
+loop: <ProactorEventLoop running=True closed=False debug=False>
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\UpbitBot\bot.py", line 267, in run_screener
+    await asyncio.sleep(CHECK_INTERVAL_SEC)
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\tasks.py", line 702, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\proactor_events.py", line 803, in _loop_self_reading
+    f = self._proactor.recv(self._ssock, 4096)
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\windows_events.py", line 488, in recv
+    ov.WSARecv(conn.fileno(), nbytes, flags)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-04-20 05:30:45  [ERROR]  Error on reading from the event loop self pipe
+loop: <ProactorEventLoop running=True closed=False debug=False>
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\UpbitBot\bot.py", line 267, in run_screener
+    await asyncio.sleep(CHECK_INTERVAL_SEC)
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\tasks.py", line 702, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 132, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\proactor_events.py", line 803, in _loop_self_reading
+    f = self._proactor.recv(self._ssock, 4096)
+  File "C:\Users\user\AppData\Local\Programs\Python\Python314\Lib\asyncio\windows_events.py", line 488, in recv
+    ov.WSARecv(conn.fileno(), nbytes, flags)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-04-20 05:31:17  [INFO]  HTTP Request: POST https://api.telegram.org/bot8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg/sendMessage "HTTP/1.1 200 OK"
+2026-04-20 05:31:17  [INFO]  ✅ Startup message sent to Telegram.
+2026-04-20 05:31:17  [INFO]  🔍 Screener loop started...
+2026-04-20 05:31:17  [INFO]  ── New scan cycle ──
+2026-04-20 05:31:20  [INFO]  Total KRW markets found: 247
+2026-04-20 05:45:36  [INFO]  Matched coins this cycle: 1
+2026-04-20 05:45:37  [INFO]  HTTP Request: POST https://api.telegram.org/bot8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg/sendMessage "HTTP/1.1 200 OK"
+2026-04-20 05:45:37  [INFO]  🚨 Alert sent: KRW-MINA | RV=4.51 | PC=0% | VC=109.56%
+2026-04-20 05:45:38  [INFO]  Cycle done in 860.6s. Next scan in 0s.
+2026-04-20 05:45:38  [INFO]  ── New scan cycle ──
+2026-04-20 05:45:41  [INFO]  Total KRW markets found: 247
