@@ -16,7 +16,7 @@ import os
 # ══════════════════════════════════════════════════════
 
 TELEGRAM_BOT_TOKEN = os.environ.get("8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg")
-TELEGRAM_CHAT_ID   = os.environ.get("7910756984",   "YOUR_CHAT_ID_HERE")
+TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID",   "7910756984")
 
 # ──────────────────────────────────────────────
 # 🔔 PUMP INCOMING Settings
