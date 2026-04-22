@@ -6,45 +6,36 @@ import requests
 from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
-from telegram.request import HTTPXRequest
-import os
 
-# ══════════════════════════════════════════════════════
-#   UPBIT KRW SMART SCREENER BOT
-#   🔔 PUMP INCOMING  — pump aane wala hai
-#   🚀 PUMP DETECTED  — pump abhi ho raha hai
-# ══════════════════════════════════════════════════════
-
-TELEGRAM_BOT_TOKEN = os.environ.get("8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg")
-TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID",   "7910756984")
-
-# ──────────────────────────────────────────────
-# 🔔 PUMP INCOMING Settings
-# Volume build ho rahi hai, price abhi zyada nahi badi
-# ──────────────────────────────────────────────
-PRE_MIN_REL_VOLUME   = 2.5    # Same as original
-PRE_MIN_VOL_CHANGE   = 100.0  # Same as original
-PRE_MIN_PRICE_CHANGE = -2.0   # Same as original
-PRE_MAX_PRICE_CHANGE = 2.0    # Price abhi 2% se kam — pump nahi hua yet
-PRE_COOLDOWN_SEC     = 1800   # 30 min cooldown
+# ============================================================
+#  ██████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗
+# ██╔════╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝
+# ██║     ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗
+# ██║     ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║
+# ╚██████╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝
+#  ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝
+#  UPBIT KRW SCREENER BOT — by Your Setup
+# ============================================================
 
 # ──────────────────────────────────────────────
-# 🚀 PUMP DETECTED Settings
-# Price actively move kar rahi hai abhi
+# ✅  CONFIG — Sirf yahan changes karo
 # ──────────────────────────────────────────────
-PUMP_MIN_REL_VOLUME   = 2.5   # Same as original
-PUMP_MIN_VOL_CHANGE   = 100.0 # Same as original
-PUMP_MIN_PRICE_CHANGE = 2.0   # Price +2% se upar — pump ho raha hai
-PUMP_MAX_PRICE_CHANGE = 5.0   # Same as original max
-PUMP_COOLDOWN_SEC     = 3600  # 1 hour cooldown
 
-# ── Bot behavior ──
-CHECK_INTERVAL_SEC = 45  # Har 45 sec scan (faster)
+TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"   # @BotFather se lo
+TELEGRAM_CHAT_ID   = "YOUR_CHAT_ID_HERE"     # @userinfobot se lo
 
-UPBIT_BASE = "https://api.upbit.com/v1"
+# Screening filters
+MIN_REL_VOLUME     = 2.5      # Relative Volume minimum
+MIN_PRICE_CHANGE   = -2.0     # Price change 24h minimum (%)
+MAX_PRICE_CHANGE   = 5.0      # Price change 24h maximum (%)
+MIN_VOLUME_CHANGE  = 100.0    # Volume change 24h minimum (%)
+
+# Bot behavior
+CHECK_INTERVAL_SEC = 60       # Har kitne seconds mein check kare (60 = 1 min)
+ALERT_COOLDOWN_SEC = 3600     # Same coin ko kitne der baad dobara alert kare (1 hour)
 
 # ──────────────────────────────────────────────
-# Logging
+# Logging setup
 # ──────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -58,333 +49,266 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────
-# Upbit API Functions
+# Upbit API functions
 # ──────────────────────────────────────────────
 
-def get_all_krw_markets():
+UPBIT_BASE = "https://api.upbit.com/v1"
+
+def get_all_krw_markets() -> list[str]:
+    """Get all KRW markets from Upbit."""
+    url = f"{UPBIT_BASE}/market/all?isDetails=false"
     try:
-        r = requests.get(f"{UPBIT_BASE}/market/all?isDetails=false", timeout=15)
+        r = requests.get(url, timeout=10)
         r.raise_for_status()
         markets = [m["market"] for m in r.json() if m["market"].startswith("KRW-")]
-        log.info(f"Markets found: {len(markets)}")
+        log.info(f"Total KRW markets found: {len(markets)}")
         return markets
     except Exception as e:
-        log.error(f"Markets error: {e}")
+        log.error(f"Error fetching markets: {e}")
         return []
 
 
-def get_ticker_data(markets):
+def get_ticker_data(markets: list[str]) -> list[dict]:
+    """Fetch 24h ticker data for given markets (batch of 100 max)."""
     results = []
-    for i in range(0, len(markets), 100):
-        batch = markets[i:i+100]
+    batch_size = 100
+    for i in range(0, len(markets), batch_size):
+        batch = markets[i:i + batch_size]
+        params = {"markets": ",".join(batch)}
         try:
-            r = requests.get(f"{UPBIT_BASE}/ticker",
-                             params={"markets": ",".join(batch)}, timeout=15)
+            r = requests.get(f"{UPBIT_BASE}/ticker", params=params, timeout=10)
             r.raise_for_status()
             results.extend(r.json())
         except Exception as e:
-            log.error(f"Ticker error: {e}")
+            log.error(f"Ticker fetch error (batch {i}): {e}")
     return results
 
 
-def get_candle_data(market, count=8):
-    try:
-        r = requests.get(f"{UPBIT_BASE}/candles/days",
-                         params={"market": market, "count": count}, timeout=10)
-        r.raise_for_status()
-        return r.json()
-    except Exception:
-        return []
+def calculate_relative_volume(ticker: dict) -> float:
+    """
+    Upbit doesn't provide historical avg volume directly.
+    We estimate Relative Volume using:
+      rel_vol = acc_trade_volume_24h / (acc_trade_volume_24h / (change_rate+1))
+    But a more practical approach:
+      We compare current volume against the 'typical' volume
+      by fetching candle data for past 7 days.
+    For efficiency, we use a simpler proxy:
+      Upbit provides acc_trade_volume (current period) but no baseline.
+    
+    PRACTICAL METHOD used here:
+      We fetch 7x daily candles and compute average daily volume,
+      then compare today's 24h volume against that average.
+    """
+    market = ticker.get("market", "")
+    current_vol = ticker.get("acc_trade_volume_24h", 0)
 
-
-def get_minute_candles(market, unit=5, count=12):
-    """Last 1 hour ke 5-min candles — recent price action check karne ke liye"""
-    try:
-        r = requests.get(f"{UPBIT_BASE}/candles/minutes/{unit}",
-                         params={"market": market, "count": count}, timeout=10)
-        r.raise_for_status()
-        return r.json()
-    except Exception:
-        return []
-
-
-def calculate_relative_volume(market, current_vol_24h):
-    """7 din average se Rel Volume calculate karo"""
-    if current_vol_24h == 0:
+    if current_vol == 0:
         return 0.0
+
     try:
-        candles = get_candle_data(market, count=8)
+        # Get last 7 days of daily candles
+        url = f"{UPBIT_BASE}/candles/days"
+        params = {"market": market, "count": 8}  # 8 to exclude today partially
+        r = requests.get(url, params=params, timeout=8)
+        r.raise_for_status()
+        candles = r.json()
+
         if len(candles) < 2:
             return 0.0
+
+        # Exclude the most recent candle (today, incomplete) → use [1:]
         past_volumes = [c["candle_acc_trade_volume"] for c in candles[1:]]
+        if not past_volumes:
+            return 0.0
+
         avg_vol = sum(past_volumes) / len(past_volumes)
         if avg_vol == 0:
             return 0.0
-        return round(current_vol_24h / avg_vol, 2)
-    except Exception:
+
+        rel_vol = current_vol / avg_vol
+        return round(rel_vol, 2)
+
+    except Exception as e:
+        log.warning(f"RelVol calc error for {market}: {e}")
         return 0.0
 
 
-def calculate_volume_change(market):
-    """Aaj ka volume vs kal ka volume"""
-    try:
-        candles = get_candle_data(market, count=2)
-        if len(candles) < 2:
-            return 0.0
-        today_vol = candles[0]["candle_acc_trade_volume"]
-        prev_vol  = candles[1]["candle_acc_trade_volume"]
-        if prev_vol == 0:
-            return 0.0
-        return round(((today_vol - prev_vol) / prev_vol) * 100, 2)
-    except Exception:
-        return 0.0
-
-
-def get_recent_price_change(market):
-    """Last 1 ghante mein price kitni badi — recent momentum check"""
-    try:
-        candles = get_minute_candles(market, unit=5, count=12)
-        if len(candles) < 2:
-            return 0.0
-        # Most recent candle close vs 1 hour ago open
-        recent_close = candles[0]["trade_price"]
-        old_open     = candles[-1]["opening_price"]
-        if old_open == 0:
-            return 0.0
-        return round(((recent_close - old_open) / old_open) * 100, 2)
-    except Exception:
-        return 0.0
-
-
-# ──────────────────────────────────────────────
-# Screening Logic
-# ──────────────────────────────────────────────
-
-def screen_all_coins(tickers):
-    """
-    Returns two lists:
-    - incoming: PUMP INCOMING coins
-    - detected: PUMP DETECTED coins
-    """
-    incoming = []
-    detected = []
+def screen_coins(tickers: list[dict]) -> list[dict]:
+    """Apply all filters and return matching coins."""
+    matched = []
 
     for t in tickers:
         try:
             market        = t.get("market", "")
-            price_change  = round(t.get("signed_change_rate", 0) * 100, 2)
-            current_vol   = t.get("acc_trade_volume_24h", 0)
+            price_change  = round(t.get("signed_change_rate", 0) * 100, 2)  # to %
+            trade_vol_24h = t.get("acc_trade_volume_24h", 0)
+            prev_vol      = t.get("prev_closing_price", 0)   # proxy
             current_price = t.get("trade_price", 0)
-            base          = market.replace("KRW-", "")
 
-            # Skip very low volume coins (noise filter)
-            trade_price_krw = current_price * current_vol
-            if trade_price_krw < 500_000_000:  # Less than 500M KRW = skip
+            # ── Filter 1: Price change in range ──
+            if not (MIN_PRICE_CHANGE <= price_change <= MAX_PRICE_CHANGE):
                 continue
 
-            # Calculate volume metrics
-            vol_change = calculate_volume_change(market)
-            rel_vol    = calculate_relative_volume(market, current_vol)
+            # ── Filter 2: Volume change ──
+            # Upbit gives acc_trade_volume_24h but no direct prev 24h vol.
+            # We use: volume_change = (current_vol - estimated_prev) / estimated_prev * 100
+            # Proxy: yesterday's candle volume
+            try:
+                url = f"{UPBIT_BASE}/candles/days"
+                r   = requests.get(url, params={"market": market, "count": 2}, timeout=8)
+                r.raise_for_status()
+                candles = r.json()
+                if len(candles) >= 2:
+                    prev_day_vol  = candles[1]["candle_acc_trade_volume"]
+                    today_vol_est = candles[0]["candle_acc_trade_volume"]
+                    if prev_day_vol > 0:
+                        vol_change = ((today_vol_est - prev_day_vol) / prev_day_vol) * 100
+                    else:
+                        vol_change = 0
+                else:
+                    vol_change = 0
+            except Exception:
+                vol_change = 0
 
-            # Both need minimum vol conditions (same as original)
-            if rel_vol < 2.5 or vol_change < 100.0:
+            if vol_change < MIN_VOLUME_CHANGE:
                 continue
 
-            coin_data = {
+            # ── Filter 3: Relative Volume ──
+            rel_vol = calculate_relative_volume(t)
+            if rel_vol < MIN_REL_VOLUME:
+                continue
+
+            # ── All filters passed ──
+            base_currency = market.replace("KRW-", "")
+            matched.append({
                 "market":       market,
-                "base":         base,
+                "base":         base_currency,
+                "quote":        "KRW",
                 "price":        current_price,
                 "price_change": price_change,
-                "vol_change":   vol_change,
+                "vol_change":   round(vol_change, 2),
                 "rel_vol":      rel_vol,
-                "trade_vol":    round(current_vol, 2),
-            }
-
-            # 🔔 PUMP INCOMING — volume hai but price abhi kam hai
-            if PRE_MIN_PRICE_CHANGE <= price_change <= PRE_MAX_PRICE_CHANGE:
-                # Extra check: last 1 hour mein price zyada nahi badi
-                recent_change = get_recent_price_change(market)
-                coin_data["recent_change"] = recent_change
-                if recent_change <= 1.5:  # Last 1 hour mein 1.5% se kam movement
-                    incoming.append(coin_data)
-
-            # 🚀 PUMP DETECTED — price abhi actively move kar rahi hai
-            elif PUMP_MIN_PRICE_CHANGE <= price_change <= PUMP_MAX_PRICE_CHANGE:
-                detected.append(coin_data)
+                "trade_vol":    round(trade_vol_24h, 2),
+            })
 
         except Exception as e:
-            log.warning(f"Screen error {t.get('market','?')}: {e}")
+            log.warning(f"Screening error for {t.get('market','?')}: {e}")
             continue
 
-    return incoming, detected
+    return matched
 
 
 # ──────────────────────────────────────────────
-# Message Formatters
+# Telegram message formatter
 # ──────────────────────────────────────────────
 
-def format_incoming(coin):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return (
+def format_alert(coin: dict) -> str:
+    price_emoji  = "🟢" if coin["price_change"] >= 0 else "🔴"
+    vol_emoji    = "🔥" if coin["vol_change"] >= 200 else "📈"
+    rv_emoji     = "⚡" if coin["rel_vol"] >= 5 else "📊"
+    now          = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    msg = (
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔔 *PUMP INCOMING* — Upbit\n"
+        f"🚨 *SIGNAL DETECTED* — Upbit\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💎 *Coin:*  `{coin['base']} / KRW`\n"
         f"💰 *Price:*  `₩{coin['price']:,.0f}`\n"
-        f"📊 *24h Change:*  `{coin['price_change']:+.2f}%`\n"
-        f"⏱ *1h Change:*  `{coin.get('recent_change', 0):+.2f}%`\n"
-        f"📈 *Vol Change:*  `+{coin['vol_change']:.2f}%`\n"
-        f"⚡ *Rel Volume:*  `{coin['rel_vol']:.2f}x`\n"
-        f"📦 *24h Volume:*  `{coin['trade_vol']:,.0f} {coin['base']}`\n"
-        f"🏦 *Exchange:*  Upbit\n"
-        f"🕐 *Time:*  `{now}`\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚠️ _Volume build ho rahi hai — pump aa sakta hai!_\n"
-        f"#Upbit #KRW #{coin['base']} #PumpIncoming"
-    )
-
-
-def format_detected(coin):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    rv_emoji = "⚡" if coin["rel_vol"] >= 5 else "📊"
-    return (
-        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🚀 *PUMP DETECTED* — Upbit\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💎 *Coin:*  `{coin['base']} / KRW`\n"
-        f"💰 *Price:*  `₩{coin['price']:,.0f}`\n"
-        f"🟢 *24h Change:*  `{coin['price_change']:+.2f}%`\n"
-        f"🔥 *Vol Change:*  `+{coin['vol_change']:.2f}%`\n"
+        f"{price_emoji} *24h Change:*  `{coin['price_change']:+.2f}%`\n"
+        f"{vol_emoji} *Vol Change:*  `+{coin['vol_change']:.2f}%`\n"
         f"{rv_emoji} *Rel Volume:*  `{coin['rel_vol']:.2f}x`\n"
-        f"📦 *24h Volume:*  `{coin['trade_vol']:,.0f} {coin['base']}`\n"
+        f"📦 *24h Volume:*  `{coin['trade_vol']:,.2f} {coin['base']}`\n"
         f"🏦 *Exchange:*  Upbit\n"
         f"🕐 *Time:*  `{now}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 _Pump abhi active hai — chart check karo!_\n"
-        f"#Upbit #KRW #{coin['base']} #PumpDetected"
+        f"#Upbit #KRW #{coin['base']} #Screener"
     )
+    return msg
 
 
 # ──────────────────────────────────────────────
-# Telegram Send with Retry
-# ──────────────────────────────────────────────
-
-async def send_message(bot, chat_id, text, retries=3):
-    for attempt in range(retries):
-        try:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                parse_mode=ParseMode.MARKDOWN
-            )
-            return True
-        except TelegramError as e:
-            log.warning(f"Send attempt {attempt+1} failed: {e}")
-            if attempt < retries - 1:
-                await asyncio.sleep(5)
-    return False
-
-
-# ──────────────────────────────────────────────
-# Main Loop
+# Main bot loop
 # ──────────────────────────────────────────────
 
 async def run_screener():
-    request = HTTPXRequest(connect_timeout=30, read_timeout=30)
-    bot = Bot(token=TELEGRAM_BOT_TOKEN, request=request)
-
-    # Cooldown trackers
-    alerted_incoming = {}  # market → last alert time
-    alerted_detected = {}
-
-    log.info("🤖 Smart Screener starting...")
-
-    # Connection test
-    for attempt in range(5):
-        try:
-            me = await bot.get_me()
-            log.info(f"✅ Connected: @{me.username}")
-            break
-        except Exception as e:
-            log.warning(f"Connect attempt {attempt+1}/5: {e}")
-            await asyncio.sleep(10)
-    else:
-        log.error("❌ Cannot connect to Telegram.")
-        return
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    alerted: dict[str, float] = {}  # market → last alert timestamp
 
     # Startup message
-    await send_message(
-        bot, TELEGRAM_CHAT_ID,
-        (
-            "🤖 *Upbit Smart Screener — ONLINE* ✅\n\n"
-            "📌 *Two Alert Types:*\n\n"
-            "🔔 *PUMP INCOMING*\n"
-            f"  • Rel Vol ≥ `2.5x`\n"
-            f"  • Vol Change ≥ `+100%`\n"
-            f"  • Price Change `-2%` to `+2%`\n"
-            f"  • Recent 1h move < `1.5%`\n\n"
-            "🚀 *PUMP DETECTED*\n"
-            f"  • Rel Vol ≥ `2.5x`\n"
-            f"  • Vol Change ≥ `+100%`\n"
-            f"  • Price Change `+2%` to `+5%`\n\n"
-            f"⏱ Scanning every `45s` — 24/7!"
+    try:
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=(
+                "🤖 *Upbit KRW Screener — ONLINE*\n\n"
+                f"📌 Filters Active:\n"
+                f"  • Rel Volume  ≥ `{MIN_REL_VOLUME}x`\n"
+                f"  • Price Change  `{MIN_PRICE_CHANGE}%` to `{MAX_PRICE_CHANGE}%`\n"
+                f"  • Volume Change  ≥ `+{MIN_VOLUME_CHANGE}%`\n"
+                f"  • Exchange: Upbit\n"
+                f"  • Quote: KRW\n\n"
+                f"⏱ Checking every `{CHECK_INTERVAL_SEC}s` — 24/7 active!"
+            ),
+            parse_mode=ParseMode.MARKDOWN
         )
-    )
+        log.info("✅ Startup message sent to Telegram.")
+    except TelegramError as e:
+        log.error(f"Startup message failed: {e}")
 
     log.info("🔍 Screener loop started...")
 
     while True:
         try:
             cycle_start = time.time()
-            log.info("── Scan cycle ──")
+            log.info("── New scan cycle ──")
 
             markets = get_all_krw_markets()
             if not markets:
+                log.warning("No markets fetched, retrying next cycle.")
                 await asyncio.sleep(CHECK_INTERVAL_SEC)
                 continue
 
             tickers = get_ticker_data(markets)
             if not tickers:
+                log.warning("No ticker data, retrying next cycle.")
                 await asyncio.sleep(CHECK_INTERVAL_SEC)
                 continue
 
-            incoming, detected = screen_all_coins(tickers)
-            log.info(f"Incoming: {len(incoming)} | Detected: {len(detected)}")
+            matched = screen_coins(tickers)
 
-            now_t = time.time()
+            log.info(f"Matched coins this cycle: {len(matched)}")
 
-            # Send PUMP INCOMING alerts
-            for coin in incoming:
-                mkt  = coin["market"]
-                last = alerted_incoming.get(mkt, 0)
-                if (now_t - last) >= PRE_COOLDOWN_SEC:
-                    ok = await send_message(bot, TELEGRAM_CHAT_ID, format_incoming(coin))
-                    if ok:
-                        alerted_incoming[mkt] = now_t
-                        log.info(f"🔔 INCOMING: {mkt} | RV={coin['rel_vol']} | PC={coin['price_change']}%")
-                    await asyncio.sleep(0.5)
+            for coin in matched:
+                mkt   = coin["market"]
+                now_t = time.time()
+                last  = alerted.get(mkt, 0)
 
-            # Send PUMP DETECTED alerts
-            for coin in detected:
-                mkt  = coin["market"]
-                last = alerted_detected.get(mkt, 0)
-                if (now_t - last) >= PUMP_COOLDOWN_SEC:
-                    ok = await send_message(bot, TELEGRAM_CHAT_ID, format_detected(coin))
-                    if ok:
-                        alerted_detected[mkt] = now_t
-                        log.info(f"🚀 DETECTED: {mkt} | RV={coin['rel_vol']} | PC={coin['price_change']}%")
-                    await asyncio.sleep(0.5)
+                if (now_t - last) >= ALERT_COOLDOWN_SEC:
+                    msg = format_alert(coin)
+                    try:
+                        await bot.send_message(
+                            chat_id=TELEGRAM_CHAT_ID,
+                            text=msg,
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                        alerted[mkt] = now_t
+                        log.info(f"🚨 Alert sent: {mkt} | RV={coin['rel_vol']} | PC={coin['price_change']}% | VC={coin['vol_change']}%")
+                    except TelegramError as e:
+                        log.error(f"Send failed for {mkt}: {e}")
+                    await asyncio.sleep(0.5)   # small delay between messages
+                else:
+                    remaining = int(ALERT_COOLDOWN_SEC - (now_t - last))
+                    log.info(f"⏭ Skipped {mkt} (cooldown: {remaining}s left)")
 
-            elapsed    = time.time() - cycle_start
+            elapsed = time.time() - cycle_start
             sleep_time = max(0, CHECK_INTERVAL_SEC - elapsed)
-            log.info(f"Cycle: {elapsed:.1f}s | Next: {sleep_time:.0f}s")
+            log.info(f"Cycle done in {elapsed:.1f}s. Next scan in {sleep_time:.0f}s.")
             await asyncio.sleep(sleep_time)
 
         except KeyboardInterrupt:
-            log.info("🛑 Stopped.")
+            log.info("🛑 Bot stopped by user.")
             break
         except Exception as e:
-            log.error(f"Loop error: {e}")
+            log.error(f"Unexpected error in main loop: {e}")
             await asyncio.sleep(30)
 
 
