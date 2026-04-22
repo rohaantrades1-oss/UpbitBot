@@ -21,8 +21,8 @@ from telegram.error import TelegramError
 # ✅  CONFIG — Sirf yahan changes karo
 # ──────────────────────────────────────────────
 
-TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"   # @BotFather se lo
-TELEGRAM_CHAT_ID   = "YOUR_CHAT_ID_HERE"     # @userinfobot se lo
+TELEGRAM_BOT_TOKEN = "8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg"   # @BotFather se lo
+TELEGRAM_CHAT_ID   = "7910756984"     # @userinfobot se lo
 
 # Screening filters
 MIN_REL_VOLUME     = 2.5      # Relative Volume minimum
