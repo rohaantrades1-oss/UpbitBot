@@ -22,7 +22,7 @@ from telegram.error import TelegramError
 # ──────────────────────────────────────────────
 
 TELEGRAM_BOT_TOKEN = "8623031794:AAH-bQahzOhMhK-PMGyBMi4ktMmSTOJVovg"   # @BotFather se lo
-TELEGRAM_CHAT_ID   = "7910756984"     # @userinfobot se lo
+TELEGRAM_CHAT_ID   = "-1003901790552"     # @userinfobot se lo
 
 # Screening filters
 MIN_REL_VOLUME     = 2.5      # Relative Volume minimum
